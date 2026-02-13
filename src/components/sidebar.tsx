@@ -11,6 +11,11 @@ import {
     ChevronRight,
     LogOut,
     DollarSign,
+    Landmark,
+    ArrowLeftRight,
+    TrendingUp,
+    PiggyBank,
+    Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -66,7 +71,49 @@ export default function Sidebar({ year }: { year: number }) {
 
                 {!collapsed && (
                     <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                        Months
+                        Actuals
+                    </p>
+                )}
+
+                <NavItem
+                    href="/accounts"
+                    icon={<Landmark className="h-4 w-4" />}
+                    label="Accounts"
+                    active={pathname === "/accounts"}
+                    collapsed={collapsed}
+                />
+                <NavItem
+                    href="/transactions"
+                    icon={<ArrowLeftRight className="h-4 w-4" />}
+                    label="Transactions"
+                    active={pathname === "/transactions"}
+                    collapsed={collapsed}
+                />
+                <NavItem
+                    href="/cash-flow"
+                    icon={<TrendingUp className="h-4 w-4" />}
+                    label="Cash Flow"
+                    active={pathname === "/cash-flow"}
+                    collapsed={collapsed}
+                />
+                <NavItem
+                    href="/budget"
+                    icon={<PiggyBank className="h-4 w-4" />}
+                    label="Budget"
+                    active={pathname === "/budget"}
+                    collapsed={collapsed}
+                />
+                <NavItem
+                    href="/goals"
+                    icon={<Target className="h-4 w-4" />}
+                    label="Goals"
+                    active={pathname === "/goals"}
+                    collapsed={collapsed}
+                />
+
+                {!collapsed && (
+                    <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                        Planner
                     </p>
                 )}
 

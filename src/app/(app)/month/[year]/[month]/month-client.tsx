@@ -633,34 +633,70 @@ export default function MonthClient({
                         </Card>
                     </div>
 
-                    {/* Summary Panel - 1 col */}
+                    {/* Summary Panel - 1 col (mode-aware) */}
                     <div className="space-y-4">
                         <Card className="border-border/50 bg-card/80 backdrop-blur-sm sticky top-6">
                             <CardHeader className="py-4">
-                                <CardTitle className="text-sm font-medium">Summary</CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-sm font-medium">Summary</CardTitle>
+                                    <Badge variant="outline" className="text-[9px] capitalize">
+                                        {workspaceMode}
+                                    </Badge>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <SummaryRow label="Revenue" value={revenue} currency={currency} positive />
+                                {/* Common: Income/Revenue + Expenses */}
+                                <SummaryRow
+                                    label={workspaceMode === "business" ? "Revenue" : "Income"}
+                                    value={revenue}
+                                    currency={currency}
+                                    positive
+                                />
                                 <SummaryRow label="Expenses" value={expenseTotal} currency={currency} negative />
                                 <Separator />
-                                <SummaryRow label="Net Cash Flow" value={netCashFlow} currency={currency} bold />
+                                <SummaryRow
+                                    label={workspaceMode === "business" ? "Net Cash Flow" : "Net Income"}
+                                    value={netCashFlow}
+                                    currency={currency}
+                                    bold
+                                />
                                 <Separator />
 
-                                <div className="space-y-1.5">
-                                    <label className="text-xs text-muted-foreground">Dividends Released</label>
-                                    <Input
-                                        type="number"
-                                        value={dividends}
-                                        onChange={(e) => setDividends(parseFloat(e.target.value) || 0)}
-                                        className="h-8 text-right"
-                                    />
-                                </div>
+                                {/* Business mode: Dividends + Retained Earnings */}
+                                {workspaceMode === "business" && (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-muted-foreground">Owner Draw / Dividends</label>
+                                            <Input
+                                                type="number"
+                                                value={dividends}
+                                                onChange={(e) => setDividends(parseFloat(e.target.value) || 0)}
+                                                className="h-8 text-right"
+                                            />
+                                        </div>
+                                        <SummaryRow label="Retained Earnings" value={retainedEarnings} currency={currency} bold />
+                                        <Separator />
+                                    </>
+                                )}
 
-                                <SummaryRow label="Retained Earnings" value={retainedEarnings} currency={currency} bold />
-                                <Separator />
+                                {/* Personal mode: Savings Rate */}
+                                {workspaceMode === "personal" && (
+                                    <>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-muted-foreground">Savings Rate</span>
+                                            <span className={`text-sm font-bold ${revenue > 0 && netCashFlow > 0 ? "positive-value" : "negative-value"}`}>
+                                                {revenue > 0 ? ((netCashFlow / revenue) * 100).toFixed(1) : "0.0"}%
+                                            </span>
+                                        </div>
+                                        <Separator />
+                                    </>
+                                )}
 
+                                {/* Opening Balance / Starting Cash */}
                                 <div className="space-y-1.5">
-                                    <label className="text-xs text-muted-foreground">Opening Balance</label>
+                                    <label className="text-xs text-muted-foreground">
+                                        {workspaceMode === "business" ? "Opening Balance" : "Starting Cash"}
+                                    </label>
                                     <Input
                                         type="number"
                                         value={openingBalance}
@@ -670,11 +706,11 @@ export default function MonthClient({
                                     />
                                 </div>
 
-                                {/* Closing Balance Override Toggle */}
+                                {/* Closing/Ending Balance Override */}
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <Label className="text-xs text-muted-foreground">
-                                            Override Closing Balance
+                                            {workspaceMode === "business" ? "Override Closing Balance" : "Override Ending Cash"}
                                         </Label>
                                         <Switch
                                             checked={closingOverrideEnabled}
@@ -705,10 +741,11 @@ export default function MonthClient({
 
                                 <Separator />
 
+                                {/* Closing / Ending Balance Result */}
                                 <div className="pt-2 p-3 rounded-lg bg-muted/30 space-y-2">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground flex items-center gap-1">
-                                            Closing Balance
+                                            {workspaceMode === "business" ? "Closing Balance" : "Ending Cash"}
                                             {closingOverrideEnabled && (
                                                 <Badge variant="outline" className="text-[8px] px-1 py-0 border-amber-500/30 text-amber-500">
                                                     Override
@@ -720,7 +757,10 @@ export default function MonthClient({
                                         </span>
                                     </div>
                                     <p className="text-[10px] text-muted-foreground">
-                                        = Opening ({formatCurrency(openBal, currency)}) + Net Cash Flow ({formatCurrency(netCashFlow, currency)}) − Dividends ({formatCurrency(dividends, currency)})
+                                        {workspaceMode === "business"
+                                            ? `= Opening (${formatCurrency(openBal, currency)}) + Net Cash Flow (${formatCurrency(netCashFlow, currency)}) − Dividends (${formatCurrency(dividends, currency)})`
+                                            : `= Starting Cash (${formatCurrency(openBal, currency)}) + Net Income (${formatCurrency(netCashFlow, currency)})`
+                                        }
                                     </p>
                                     {closingOverrideEnabled && closingOverride && (
                                         <p className="text-[10px] text-amber-500/70">

@@ -1,5 +1,5 @@
 // ============================================================
-// Database types for Solo Business Cash Clarity
+// Database types for Cash Clarity
 // ============================================================
 
 export type WorkspaceMode = "business" | "personal";
@@ -9,6 +9,9 @@ export type EntryDirection = "income" | "expense";
 export type CadenceType = "monthly" | "quarterly" | "yearly";
 export type MatchType = "contains" | "regex" | "exact";
 export type AuditAction = "insert" | "update" | "delete";
+export type AccountType = "checking" | "savings" | "cash" | "credit_card" | "loan" | "investment" | "other";
+export type TxnDirection = "inflow" | "outflow";
+export type TxnStatus = "pending" | "posted" | "excluded";
 
 export interface Workspace {
     id: string;
@@ -125,6 +128,97 @@ export interface EntryAuditLog {
 }
 
 // ============================================================
+// Actuals Layer
+// ============================================================
+
+export interface Institution {
+    id: string;
+    workspace_id: string;
+    name: string;
+    logo_url: string | null;
+    provider: string | null;
+    created_at: string;
+}
+
+export interface Account {
+    id: string;
+    workspace_id: string;
+    institution_id: string | null;
+    name: string;
+    account_type: AccountType;
+    currency: string;
+    is_active: boolean;
+    external_id: string | null;
+    created_at: string;
+}
+
+export interface AccountBalance {
+    id: string;
+    account_id: string;
+    as_of_date: string;
+    balance: number;
+    created_at: string;
+}
+
+export interface Transaction {
+    id: string;
+    workspace_id: string;
+    account_id: string;
+    posted_at: string;
+    description: string;
+    amount: number;
+    direction: TxnDirection;
+    category_id: string | null;
+    group_id: string | null;
+    status: TxnStatus;
+    notes: string | null;
+    external_id: string | null;
+    created_at: string;
+}
+
+export interface TransactionRule {
+    id: string;
+    workspace_id: string;
+    match_type: MatchType;
+    match_value: string;
+    category_id: string;
+    priority: number;
+    enabled: boolean;
+    created_at: string;
+}
+
+export interface NetWorthSnapshot {
+    id: string;
+    workspace_id: string;
+    as_of_date: string;
+    total_assets: number;
+    total_liabilities: number;
+    net_worth: number;
+    created_at: string;
+}
+
+export interface Budget {
+    id: string;
+    workspace_id: string;
+    period_id: string;
+    category_id: string;
+    amount: number;
+    rollover: boolean;
+    created_at: string;
+}
+
+export interface Goal {
+    id: string;
+    workspace_id: string;
+    name: string;
+    target_amount: number;
+    current_amount: number;
+    target_date: string | null;
+    linked_category_id: string | null;
+    created_at: string;
+}
+
+// ============================================================
 // Computed types
 // ============================================================
 
@@ -151,6 +245,46 @@ export interface YearSummary {
     totalNetCashFlow: number;
     totalDividends: number;
     totalRetainedEarnings: number;
+}
+
+// ============================================================
+// Reporting types
+// ============================================================
+
+export interface CashFlowSummary {
+    total_income: number;
+    total_expenses: number;
+    net_income: number;
+    savings_rate: number;
+}
+
+export interface CashFlowByGroup {
+    group_id: string | null;
+    group_name: string | null;
+    group_type: string | null;
+    direction: TxnDirection;
+    total: number;
+}
+
+export interface SankeyNode {
+    id: string;
+}
+
+export interface SankeyLink {
+    source: string;
+    target: string;
+    value: number;
+}
+
+export interface SankeyData {
+    nodes: SankeyNode[];
+    links: SankeyLink[];
+}
+
+export interface TransactionWithDetails extends Transaction {
+    account?: Account;
+    category?: Category | null;
+    group?: CategoryGroup | null;
 }
 
 // ============================================================
@@ -181,4 +315,25 @@ export interface EntryRow {
     category?: { name: string; group_id?: string | null } | null;
     isNew?: boolean;
     isEdited?: boolean;
+}
+
+// ============================================================
+// Summary Panel config type
+// ============================================================
+
+export interface SummaryFieldConfig {
+    key: string;
+    label: string;
+    type: "display" | "input" | "toggle" | "separator" | "formula";
+    colorStyle?: "positive" | "negative" | "auto" | "neutral";
+    bold?: boolean;
+    inputKey?: string; // key for period_inputs field
+    helperText?: string;
+}
+
+export interface SummaryPanelConfig {
+    fields: SummaryFieldConfig[];
+    closingLabel: string;
+    overrideLabel: string;
+    closingFormula: string;
 }
