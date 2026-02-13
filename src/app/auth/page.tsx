@@ -41,25 +41,7 @@ export default function AuthPage() {
         }
     };
 
-    const handleMagicLink = async () => {
-        if (!email) {
-            setError("Please enter your email address");
-            return;
-        }
-        setLoading(true);
-        setError("");
-        try {
-            const { error } = await supabase.auth.signInWithOtp({ email });
-            if (error) throw error;
-            setError("");
-            alert("Check your email for the magic link!");
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : "An error occurred";
-            setError(message);
-        } finally {
-            setLoading(false);
-        }
-    };
+
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -122,15 +104,7 @@ export default function AuthPage() {
                             {loading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
                         </Button>
 
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={handleMagicLink}
-                            disabled={loading}
-                        >
-                            Send Magic Link
-                        </Button>
+
 
                         <button
                             type="button"
