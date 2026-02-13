@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import type { WorkspaceMode } from "@/types/database";
 
 const MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June",
@@ -12,19 +13,20 @@ export async function createWorkspace(
     name: string,
     currency: string,
     fiscalYearStart: number,
-    year: number
+    year: number,
+    mode: WorkspaceMode = "business"
 ) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error("Not authenticated");
 
-    // Use a security-definer RPC to create workspace + member + categories atomically
-    // This bypasses RLS since the function runs as the DB owner
+    // Use a security-definer RPC to create workspace + member + groups + categories atomically
     const { data: workspaceId, error: rpcError } = await supabase.rpc("fn_create_workspace", {
         p_user_id: user.id,
         p_name: name,
         p_currency: currency,
         p_fiscal_year_start: fiscalYearStart,
+        p_mode: mode,
     });
 
     if (rpcError) throw new Error("Failed to create workspace: " + rpcError.message);
@@ -98,4 +100,34 @@ export async function ensurePeriodsForYear(workspaceId: string, year: number) {
     await supabase.rpc("fn_create_periods", {
         p_periods: periods,
     });
+}
+
+export async function updateWorkspaceMode(workspaceId: string, mode: WorkspaceMode) {
+    const supabase = await createClient();
+
+    // Use the template apply RPC which updates mode + merges template
+    const { error } = await supabase.rpc("fn_apply_template", {
+        p_workspace_id: workspaceId,
+        p_mode: mode,
+    });
+
+    if (error) throw new Error("Failed to update mode: " + error.message);
+
+    revalidatePath("/settings");
+    revalidatePath("/month");
+    revalidatePath("/dashboard");
+}
+
+export async function applyTemplate(workspaceId: string, mode: WorkspaceMode) {
+    const supabase = await createClient();
+
+    const { error } = await supabase.rpc("fn_apply_template", {
+        p_workspace_id: workspaceId,
+        p_mode: mode,
+    });
+
+    if (error) throw new Error("Failed to apply template: " + error.message);
+
+    revalidatePath("/settings");
+    revalidatePath("/month");
 }

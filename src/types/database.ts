@@ -2,6 +2,7 @@
 // Database types for Solo Business Cash Clarity
 // ============================================================
 
+export type WorkspaceMode = "business" | "personal";
 export type WorkspaceRole = "owner" | "admin" | "member" | "advisor_readonly";
 export type CategoryType = "income" | "expense" | "asset" | "liability";
 export type EntryDirection = "income" | "expense";
@@ -12,7 +13,7 @@ export type AuditAction = "insert" | "update" | "delete";
 export interface Workspace {
     id: string;
     name: string;
-    mode: string;
+    mode: WorkspaceMode;
     default_currency: string;
     fiscal_year_start_month: number;
     created_at: string;
@@ -26,12 +27,24 @@ export interface WorkspaceMember {
     created_at: string;
 }
 
+export interface CategoryGroup {
+    id: string;
+    workspace_id: string;
+    type: "income" | "expense";
+    name: string;
+    sort_order: number;
+    is_system: boolean;
+    created_at: string;
+}
+
 export interface Category {
     id: string;
     workspace_id: string;
     name: string;
     type: CategoryType;
+    group_id: string | null;
     parent_category_id: string | null;
+    sort_order: number;
     system_flag: boolean;
     created_at: string;
 }
@@ -138,4 +151,34 @@ export interface YearSummary {
     totalNetCashFlow: number;
     totalDividends: number;
     totalRetainedEarnings: number;
+}
+
+// ============================================================
+// UI helper types
+// ============================================================
+
+export interface CategoryGroupWithCategories extends CategoryGroup {
+    categories: Category[];
+}
+
+export interface GroupedEntries {
+    group: CategoryGroup;
+    categories: {
+        category: Category;
+        entries: EntryRow[];
+        total: number;
+    }[];
+    total: number;
+}
+
+export interface EntryRow {
+    id: string;
+    direction: "income" | "expense";
+    category_id: string;
+    description: string;
+    amount: number;
+    notes: string | null;
+    category?: { name: string; group_id?: string | null } | null;
+    isNew?: boolean;
+    isEdited?: boolean;
 }

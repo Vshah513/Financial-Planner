@@ -2,7 +2,63 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { Category, CategorizationRule } from "@/types/database";
+import type { Category, CategoryGroup, CategorizationRule } from "@/types/database";
+
+// ---- CATEGORY GROUPS ----
+
+export async function getCategoryGroups(workspaceId: string) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from("category_groups")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .order("type", { ascending: true })
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return (data || []) as CategoryGroup[];
+}
+
+export async function createCategoryGroup(data: {
+    workspace_id: string;
+    name: string;
+    type: "income" | "expense";
+    sort_order?: number;
+}) {
+    const supabase = await createClient();
+    const { error } = await supabase.from("category_groups").insert({
+        ...data,
+        sort_order: data.sort_order ?? 0,
+    });
+    if (error) throw new Error(error.message);
+    revalidatePath("/settings");
+    revalidatePath("/month");
+}
+
+export async function updateCategoryGroup(
+    id: string,
+    data: { name?: string; sort_order?: number }
+) {
+    const supabase = await createClient();
+    const { error } = await supabase
+        .from("category_groups")
+        .update(data)
+        .eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath("/settings");
+    revalidatePath("/month");
+}
+
+export async function deleteCategoryGroup(id: string) {
+    const supabase = await createClient();
+    const { error } = await supabase.from("category_groups").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath("/settings");
+    revalidatePath("/month");
+}
+
+// ---- CATEGORIES ----
 
 export async function getCategories(workspaceId: string) {
     const supabase = await createClient();
@@ -11,6 +67,7 @@ export async function getCategories(workspaceId: string) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .order("type", { ascending: true })
+        .order("sort_order", { ascending: true })
         .order("name", { ascending: true });
 
     if (error) throw new Error(error.message);
@@ -21,17 +78,23 @@ export async function createCategory(data: {
     workspace_id: string;
     name: string;
     type: "income" | "expense" | "asset" | "liability";
+    group_id?: string;
     parent_category_id?: string;
+    sort_order?: number;
 }) {
     const supabase = await createClient();
-    const { error } = await supabase.from("categories").insert(data);
+    const { error } = await supabase.from("categories").insert({
+        ...data,
+        sort_order: data.sort_order ?? 0,
+    });
     if (error) throw new Error(error.message);
     revalidatePath("/settings");
+    revalidatePath("/month");
 }
 
 export async function updateCategory(
     id: string,
-    data: { name?: string; type?: string; parent_category_id?: string | null }
+    data: { name?: string; type?: string; group_id?: string | null; parent_category_id?: string | null; sort_order?: number }
 ) {
     const supabase = await createClient();
     const { error } = await supabase
@@ -40,6 +103,7 @@ export async function updateCategory(
         .eq("id", id);
     if (error) throw new Error(error.message);
     revalidatePath("/settings");
+    revalidatePath("/month");
 }
 
 export async function deleteCategory(id: string) {
@@ -47,6 +111,7 @@ export async function deleteCategory(id: string) {
     const { error } = await supabase.from("categories").delete().eq("id", id);
     if (error) throw new Error(error.message);
     revalidatePath("/settings");
+    revalidatePath("/month");
 }
 
 // ---- CATEGORIZATION RULES ----
