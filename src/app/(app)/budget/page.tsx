@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getBudgetVsActual } from "@/app/actions/budgets";
 import { getCategories, getCategoryGroups } from "@/app/actions/categories";
 import BudgetClient from "./budget-client";
 
@@ -29,19 +28,55 @@ export default async function BudgetPage() {
         .eq("month", now.getMonth() + 1)
         .single();
 
-    const [categories, groups] = await Promise.all([
-        getCategories(membership.workspace_id),
-        getCategoryGroups(membership.workspace_id),
-    ]);
+    let categories: any[] = [];
+    let groups: any[] = [];
 
-    let budgetData: Awaited<ReturnType<typeof getBudgetVsActual>> = [];
+    try {
+        categories = await getCategories(membership.workspace_id);
+    } catch { /* may fail */ }
+
+    try {
+        groups = await getCategoryGroups(membership.workspace_id);
+    } catch { /* may fail */ }
+
+    let budgetData: any[] = [];
     if (period) {
-        budgetData = await getBudgetVsActual(
-            membership.workspace_id,
-            period.id,
-            period.period_start_date,
-            period.period_end_date
-        );
+        try {
+            // Get budgets
+            const { data: budgets } = await supabase
+                .from("budgets")
+                .select("*, category:categories(id, name, type, group_id)")
+                .eq("workspace_id", membership.workspace_id)
+                .eq("period_id", period.id);
+
+            // Get actual spending from transactions
+            let transactions: any[] = [];
+            try {
+                const { data: txns } = await supabase
+                    .from("transactions")
+                    .select("category_id, direction, amount")
+                    .eq("workspace_id", membership.workspace_id)
+                    .gte("posted_at", period.period_start_date)
+                    .lte("posted_at", period.period_end_date)
+                    .eq("status", "posted");
+                transactions = txns || [];
+            } catch { /* table may not exist */ }
+
+            // Build actual totals by category
+            const actualByCategory: Record<string, number> = {};
+            for (const txn of transactions) {
+                if (txn.category_id) {
+                    actualByCategory[txn.category_id] = (actualByCategory[txn.category_id] || 0) + Number(txn.amount);
+                }
+            }
+
+            budgetData = (budgets || []).map((b: any) => ({
+                ...b,
+                actual: actualByCategory[b.category_id] || 0,
+                remaining: b.amount - (actualByCategory[b.category_id] || 0),
+                percentUsed: b.amount > 0 ? Math.round(((actualByCategory[b.category_id] || 0) / b.amount) * 100) : 0,
+            }));
+        } catch { /* budgets table may not exist */ }
     }
 
     return (

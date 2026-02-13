@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getAccounts, getInstitutions, getLatestBalances, getNetWorthSnapshots } from "@/app/actions/accounts";
 import AccountsClient from "./accounts-client";
 
 export default async function AccountsPage() {
@@ -18,12 +17,62 @@ export default async function AccountsPage() {
     if (!membership) redirect("/onboarding");
     const workspace = membership.workspaces as unknown as { name: string; default_currency: string; mode: string };
 
-    const [accounts, institutions, balances, netWorthHistory] = await Promise.all([
-        getAccounts(membership.workspace_id),
-        getInstitutions(membership.workspace_id),
-        getLatestBalances(membership.workspace_id),
-        getNetWorthSnapshots(membership.workspace_id),
-    ]);
+    // Safely fetch data — tables may not exist yet
+    let accounts: any[] = [];
+    let institutions: any[] = [];
+    let balances: any[] = [];
+    let netWorthHistory: any[] = [];
+
+    try {
+        const { data } = await supabase
+            .from("institutions")
+            .select("*")
+            .eq("workspace_id", membership.workspace_id)
+            .order("name");
+        institutions = data || [];
+    } catch { /* table may not exist */ }
+
+    try {
+        const { data } = await supabase
+            .from("accounts")
+            .select("*, institution:institutions(*)")
+            .eq("workspace_id", membership.workspace_id)
+            .order("created_at", { ascending: true });
+        accounts = data || [];
+    } catch { /* table may not exist */ }
+
+    try {
+        // Get latest balances inline
+        if (accounts.length > 0) {
+            const activeAccounts = accounts.filter((a: any) => a.is_active);
+            for (const account of activeAccounts) {
+                const { data: bal } = await supabase
+                    .from("account_balances")
+                    .select("balance, as_of_date")
+                    .eq("account_id", account.id)
+                    .order("as_of_date", { ascending: false })
+                    .limit(1)
+                    .single();
+
+                balances.push({
+                    ...account,
+                    institution: account.institution,
+                    latest_balance: bal?.balance ?? null,
+                    balance_date: bal?.as_of_date ?? null,
+                });
+            }
+        }
+    } catch { /* table may not exist */ }
+
+    try {
+        const { data } = await supabase
+            .from("net_worth_snapshots")
+            .select("*")
+            .eq("workspace_id", membership.workspace_id)
+            .order("as_of_date", { ascending: false })
+            .limit(12);
+        netWorthHistory = data || [];
+    } catch { /* table may not exist */ }
 
     return (
         <AccountsClient

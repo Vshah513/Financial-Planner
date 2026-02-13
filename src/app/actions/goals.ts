@@ -2,17 +2,20 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { Goal } from "@/types/database";
 
 export async function getGoals(workspaceId: string) {
     const supabase = await createClient();
-    const { data, error } = await supabase
-        .from("goals")
-        .select("*, linked_category:categories(id, name)")
-        .eq("workspace_id", workspaceId)
-        .order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
-    return data || [];
+    try {
+        const { data, error } = await supabase
+            .from("goals")
+            .select("*, linked_category:categories(id, name)")
+            .eq("workspace_id", workspaceId)
+            .order("created_at", { ascending: true });
+        if (error) throw new Error(error.message);
+        return data || [];
+    } catch {
+        return [];
+    }
 }
 
 export async function createGoal(data: {
@@ -33,7 +36,13 @@ export async function createGoal(data: {
 
 export async function updateGoal(
     id: string,
-    data: Partial<Pick<Goal, "name" | "target_amount" | "target_date" | "current_amount" | "linked_category_id">>
+    data: Partial<{
+        name: string;
+        target_amount: number;
+        current_amount: number;
+        target_date: string | null;
+        linked_category_id: string | null;
+    }>
 ) {
     const supabase = await createClient();
     const { error } = await supabase.from("goals").update(data).eq("id", id);
@@ -48,27 +57,37 @@ export async function deleteGoal(id: string) {
     revalidatePath("/goals");
 }
 
-export async function syncGoalProgress(workspaceId: string) {
+export async function syncGoalProgress(goalId: string) {
     const supabase = await createClient();
-    const { data: goals } = await supabase
-        .from("goals")
-        .select("id, linked_category_id")
-        .eq("workspace_id", workspaceId)
-        .not("linked_category_id", "is", null);
+    try {
+        const { data: goal } = await supabase
+            .from("goals")
+            .select("*")
+            .eq("id", goalId)
+            .single();
 
-    if (!goals) return;
+        if (!goal?.linked_category_id) return;
 
-    for (const goal of goals) {
-        const { data: txns } = await supabase
+        // Sum transactions for this category
+        const { data: transactions } = await supabase
             .from("transactions")
             .select("amount, direction")
-            .eq("workspace_id", workspaceId)
+            .eq("workspace_id", goal.workspace_id)
             .eq("category_id", goal.linked_category_id)
             .eq("status", "posted");
 
-        const total = (txns || []).reduce((sum, t) => sum + Number(t.amount), 0);
-        await supabase.from("goals").update({ current_amount: total }).eq("id", goal.id);
-    }
+        let total = 0;
+        for (const txn of transactions || []) {
+            total += Number(txn.amount);
+        }
 
-    revalidatePath("/goals");
+        await supabase
+            .from("goals")
+            .update({ current_amount: total })
+            .eq("id", goalId);
+
+        revalidatePath("/goals");
+    } catch {
+        // Silently fail if tables don't exist
+    }
 }

@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getGoals } from "@/app/actions/goals";
 import { getCategories } from "@/app/actions/categories";
 import GoalsClient from "./goals-client";
 
@@ -19,10 +18,21 @@ export default async function GoalsPage() {
     if (!membership) redirect("/onboarding");
     const workspace = membership.workspaces as unknown as { name: string; default_currency: string };
 
-    const [goals, categories] = await Promise.all([
-        getGoals(membership.workspace_id),
-        getCategories(membership.workspace_id),
-    ]);
+    let goals: any[] = [];
+    let categories: any[] = [];
+
+    try {
+        const { data } = await supabase
+            .from("goals")
+            .select("*, linked_category:categories(id, name)")
+            .eq("workspace_id", membership.workspace_id)
+            .order("created_at", { ascending: true });
+        goals = data || [];
+    } catch { /* table may not exist */ }
+
+    try {
+        categories = await getCategories(membership.workspace_id);
+    } catch { /* may fail */ }
 
     return (
         <GoalsClient
