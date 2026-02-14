@@ -16,7 +16,9 @@ import {
     TrendingUp,
     PiggyBank,
     Target,
+    Wrench,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
@@ -66,6 +68,14 @@ export default function Sidebar({ year }: { year: number }) {
                     icon={<LayoutDashboard className="h-4 w-4" />}
                     label="Dashboard"
                     active={pathname === "/dashboard"}
+                    collapsed={collapsed}
+                />
+
+                <NavItem
+                    href="/tools"
+                    icon={<Wrench className="h-4 w-4" />}
+                    label="Tools"
+                    active={pathname.startsWith("/tools")}
                     collapsed={collapsed}
                 />
 
