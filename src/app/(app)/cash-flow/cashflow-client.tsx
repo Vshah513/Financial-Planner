@@ -139,7 +139,8 @@ export default function CashFlowClient({
         refreshData(dateFrom, dateTo, mode);
     };
 
-    const hasSankeyData = sankeyData.nodes.length > 0 && sankeyData.links.length > 0;
+    const hasSankeyData = Array.isArray(sankeyData?.nodes) && sankeyData.nodes.length > 0 &&
+        Array.isArray(sankeyData?.links) && sankeyData.links.length > 0;
 
     return (
         <div className="space-y-6">
