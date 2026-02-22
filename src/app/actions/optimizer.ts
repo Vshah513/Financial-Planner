@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { calculateNetCashFlow } from "@/lib/calculations";
 import { redirect } from "next/navigation";
 
 /**
@@ -10,28 +11,28 @@ import { redirect } from "next/navigation";
 export async function getOptimizerBaselines(workspaceId: string) {
     const supabase = await createClient();
 
-    // Get actuals baseline (last 60 days average)
-    const sixtyDaysAgo = new Date();
-    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-
+    // Get all transactions to find the date range and calculate averages
     const { data: transactions } = await supabase
         .from("transactions")
         .select(`
+      date,
       amount,
       type,
       category_id,
       categories(name, type)
     `)
         .eq("workspace_id", workspaceId)
-        .gte("date", sixtyDaysAgo.toISOString().split("T")[0])
         .order("date", { ascending: false });
 
     let actualsBaseline = null;
 
     if (transactions && transactions.length > 0) {
-        // Calculate monthly averages
-        const daysCovered = 60;
-        const monthlyMultiplier = 30 / daysCovered;
+        // Find date range
+        const dates = transactions.map((t) => new Date(t.date));
+        const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+        const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+
+        const monthsCovered = Math.max(1, (maxDate.getFullYear() - minDate.getFullYear()) * 12 + (maxDate.getMonth() - minDate.getMonth()) + 1);
 
         const totalIncome = transactions
             .filter((t) => t.type === "income")
@@ -47,69 +48,81 @@ export async function getOptimizerBaselines(workspaceId: string) {
             .filter((t) => t.type === "expense")
             .forEach((t) => {
                 const categoryName = (t.categories as any)?.name || "Uncategorized";
-                expenseBreakdown[categoryName] = (expenseBreakdown[categoryName] || 0) + Number(t.amount);
+                expenseBreakdown[categoryName] = (expenseBreakdown[categoryName] || 0) + (Number(t.amount) / monthsCovered);
             });
+
+        // Format period window
+        let periodWindow = "";
+        if (monthsCovered === 1) {
+            periodWindow = minDate.toLocaleString("default", { month: "long", year: "numeric" });
+        } else {
+            periodWindow = `${minDate.toLocaleString("default", { month: "short", year: "numeric" })} - ${maxDate.toLocaleString("default", { month: "short", year: "numeric" })}`;
+        }
 
         actualsBaseline = {
             source: "actuals" as const,
-            monthlyIncome: totalIncome * monthlyMultiplier,
-            monthlyExpenses: totalExpenses * monthlyMultiplier,
-            periodWindow: "Last 60 days",
+            monthlyIncome: totalIncome / monthsCovered,
+            monthlyExpenses: totalExpenses / monthsCovered,
+            periodWindow,
             expenseBreakdown,
+            monthsCovered,
         };
     }
 
-    // Get planner baseline (current month or average of recent months)
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth() + 1;
-
-    const { data: period } = await supabase
+    // Get planner baselines - sort periods by newest first to find the most recent populated one
+    const { data: periods } = await supabase
         .from("periods")
-        .select("id")
+        .select("id, year, month")
         .eq("workspace_id", workspaceId)
-        .eq("year", currentYear)
-        .eq("month", currentMonth)
-        .single();
+        .order("year", { ascending: false })
+        .order("month", { ascending: false });
 
     let plannerBaseline = null;
 
-    if (period) {
-        const { data: entries } = await supabase
-            .from("ledger_entries")
-            .select(`
-        amount,
-        direction,
-        category_id,
-        categories(name, type)
-      `)
-            .eq("period_id", period.id);
+    if (periods && periods.length > 0) {
+        // Find the most recent period that actually has ledger entries
+        for (const p of periods) {
+            const { data: entries } = await supabase
+                .from("ledger_entries")
+                .select(`
+            amount,
+            direction,
+            category_id,
+            categories(name, type)
+          `)
+                .eq("period_id", p.id);
 
-        if (entries && entries.length > 0) {
-            const totalIncome = entries
-                .filter((e) => e.direction === "income")
-                .reduce((sum, e) => sum + Number(e.amount), 0);
+            if (entries && entries.length > 0) {
+                const totalIncome = entries
+                    .filter((e) => e.direction === "income")
+                    .reduce((sum, e) => sum + Number(e.amount), 0);
 
-            const totalExpenses = entries
-                .filter((e) => e.direction === "expense")
-                .reduce((sum, e) => sum + Number(e.amount), 0);
+                const totalExpenses = entries
+                    .filter((e) => e.direction === "expense")
+                    .reduce((sum, e) => sum + Number(e.amount), 0);
 
-            // Build expense breakdown by category
-            const expenseBreakdown: Record<string, number> = {};
-            entries
-                .filter((e) => e.direction === "expense")
-                .forEach((e) => {
-                    const categoryName = (e.categories as any)?.name || "Uncategorized";
-                    expenseBreakdown[categoryName] = (expenseBreakdown[categoryName] || 0) + Number(e.amount);
-                });
+                // Build expense breakdown by category
+                const expenseBreakdown: Record<string, number> = {};
+                entries
+                    .filter((e) => e.direction === "expense")
+                    .forEach((e) => {
+                        const categoryName = (e.categories as any)?.name || "Uncategorized";
+                        expenseBreakdown[categoryName] = (expenseBreakdown[categoryName] || 0) + Number(e.amount);
+                    });
 
-            plannerBaseline = {
-                source: "planner" as const,
-                monthlyIncome: totalIncome,
-                monthlyExpenses: totalExpenses,
-                periodWindow: `${currentYear}-${currentMonth.toString().padStart(2, "0")}`,
-                expenseBreakdown,
-            };
+                const periodDate = new Date(p.year, p.month - 1);
+                const periodWindow = periodDate.toLocaleString("default", { month: "long", year: "numeric" });
+
+                plannerBaseline = {
+                    source: "planner" as const,
+                    monthlyIncome: totalIncome,
+                    monthlyExpenses: totalExpenses,
+                    periodWindow,
+                    expenseBreakdown,
+                    monthsCovered: 1,
+                };
+                break; // Found the latest populated period, stop looking
+            }
         }
     }
 
@@ -195,7 +208,8 @@ export async function calculateSavingsOptimization(
     );
 
     const requiredMonthly = targetAmount / monthsToDeadline;
-    const currentSavings = Math.max(0, baselineIncome - baselineExpenses);
+    const currentNetCashFlow = calculateNetCashFlow(baselineIncome, baselineExpenses);
+    const currentSavings = Math.max(0, currentNetCashFlow);
     const gap = requiredMonthly - currentSavings;
 
     // If already on track, return early

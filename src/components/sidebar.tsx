@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
     LayoutDashboard,
@@ -50,12 +51,15 @@ export default function Sidebar({ year }: { year: number }) {
             )}
         >
             {/* Header */}
-            <div className="flex items-center gap-2 px-4 py-5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <DollarSign className="h-4 w-4" />
-                </div>
-                {!collapsed && (
-                    <span className="text-sm font-bold tracking-tight">Cash Clarity</span>
+            <div className={`flex items-center w-full ${collapsed ? 'justify-center p-4' : 'px-4 py-6'}`}>
+                {!collapsed ? (
+                    <div className="w-full flex justify-center items-center overflow-hidden bg-transparent">
+                        <Image src="/New Logo.png" alt="Cash Clarity" width={120} height={60} className="w-[80%] max-w-[160px] h-auto object-cover" priority />
+                    </div>
+                ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md">
+                        <Image src="/New Logo.png" alt="Cash Clarity Logo" width={60} height={60} className="object-cover w-full h-full scale-125" />
+                    </div>
                 )}
             </div>
 
@@ -71,13 +75,15 @@ export default function Sidebar({ year }: { year: number }) {
                     collapsed={collapsed}
                 />
 
-                <NavItem
-                    href="/tools"
-                    icon={<Wrench className="h-4 w-4" />}
-                    label="Tools"
-                    active={pathname.startsWith("/tools")}
-                    collapsed={collapsed}
-                />
+                <div id="tour-tools-link">
+                    <NavItem
+                        href="/tools"
+                        icon={<Wrench className="h-4 w-4" />}
+                        label="Tools"
+                        active={pathname.startsWith("/tools")}
+                        collapsed={collapsed}
+                    />
+                </div>
 
                 {!collapsed && (
                     <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -127,38 +133,44 @@ export default function Sidebar({ year }: { year: number }) {
                     </p>
                 )}
 
-                {MONTHS.map((month, i) => (
-                    <NavItem
-                        key={month}
-                        href={`/month/${year}/${i + 1}`}
-                        icon={<Calendar className="h-4 w-4" />}
-                        label={month}
-                        active={pathname === `/month/${year}/${i + 1}`}
-                        collapsed={collapsed}
-                    />
-                ))}
+                <div id="tour-month-link" className={cn("grid", collapsed ? "grid-cols-1 gap-1" : "grid-cols-2 gap-1 px-1")}>
+                    {MONTHS.map((month, i) => (
+                        <NavItem
+                            key={month}
+                            href={`/month/${year}/${i + 1}`}
+                            icon={<Calendar className="h-4 w-4 shrink-0" />}
+                            label={collapsed ? month : month.slice(0, 3)}
+                            active={pathname === `/month/${year}/${i + 1}`}
+                            collapsed={collapsed}
+                        />
+                    ))}
+                </div>
 
-                <Separator className="my-2" />
-
-                <NavItem
-                    href="/settings"
-                    icon={<Settings className="h-4 w-4" />}
-                    label="Settings"
-                    active={pathname === "/settings"}
-                    collapsed={collapsed}
-                />
-
-                <NavItem
-                    href="/export"
-                    icon={<Download className="h-4 w-4" />}
-                    label="Export / Import"
-                    active={pathname === "/export"}
-                    collapsed={collapsed}
-                />
             </nav>
 
             {/* Footer */}
             <div className="border-t border-border p-2 space-y-1">
+                <div id="tour-settings-link">
+                    <NavItem
+                        href="/settings"
+                        icon={<Settings className="h-4 w-4" />}
+                        label="Settings"
+                        active={pathname === "/settings"}
+                        collapsed={collapsed}
+                    />
+                </div>
+
+                <div id="tour-export-link">
+                    <NavItem
+                        href="/export"
+                        icon={<Download className="h-4 w-4" />}
+                        label="Export / Import"
+                        active={pathname === "/export"}
+                        collapsed={collapsed}
+                    />
+                </div>
+
+                <Separator className="my-2" />
                 <Button
                     variant="ghost"
                     size="sm"

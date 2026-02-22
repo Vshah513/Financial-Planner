@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { calculateNetCashFlow, calculateRetainedEarnings, calculateClosingBalance } from "@/lib/calculations";
 import { revalidatePath } from "next/cache";
 
 export async function upsertPeriodOverrides(
@@ -98,15 +99,15 @@ export async function getYearSummary(workspaceId: string, year: number) {
             .filter((e) => e.direction === "expense")
             .reduce((sum, e) => sum + Number(e.amount), 0);
 
-        const netCashFlow = revenue - expenses;
         const dividendsReleased = override?.dividends_released || 0;
-        const retainedEarnings = netCashFlow - dividendsReleased;
+        const netCashFlow = calculateNetCashFlow(revenue, expenses);
+        const retainedEarnings = calculateRetainedEarnings(netCashFlow, dividendsReleased);
         const openingBalance = override?.opening_balance_override ?? null;
         const closingBalance =
             override?.closing_balance_override ??
             (openingBalance !== null
-                ? openingBalance + netCashFlow - dividendsReleased
-                : netCashFlow - dividendsReleased);
+                ? calculateClosingBalance(openingBalance, netCashFlow, dividendsReleased)
+                : calculateRetainedEarnings(netCashFlow, dividendsReleased));
 
         summaries.push({
             period,

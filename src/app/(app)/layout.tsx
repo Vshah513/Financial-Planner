@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/sidebar";
+import { ProductTour } from "@/components/product-tour";
 
 export default async function AppLayout({
     children,
@@ -27,6 +28,7 @@ export default async function AppLayout({
     return (
         <div className="flex min-h-screen">
             <Sidebar year={currentYear} />
+            <ProductTour />
             <main className="ml-60 flex-1 p-6 lg:p-8 transition-all duration-300">
                 {children}
             </main>

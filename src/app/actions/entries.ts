@@ -26,6 +26,34 @@ export async function createEntry(data: {
     revalidatePath(`/month`);
 }
 
+export async function upsertEntries(
+    entries: {
+        id: string; // The client-generated UUID
+        workspace_id: string;
+        period_id: string;
+        direction: "income" | "expense";
+        category_id: string;
+        description: string;
+        amount: number;
+        notes?: string;
+    }[]
+) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const withUser = entries.map((e) => ({
+        ...e,
+        created_by: user.id,
+        updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase.from("ledger_entries").upsert(withUser);
+
+    if (error) throw new Error(error.message);
+    revalidatePath(`/month`);
+}
+
 export async function updateEntry(
     id: string,
     data: {

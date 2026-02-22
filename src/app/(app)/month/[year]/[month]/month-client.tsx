@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -24,12 +24,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-    createEntry, updateEntry, deleteEntry, bulkCreateEntries,
+    createEntry, updateEntry, deleteEntry, bulkCreateEntries, upsertEntries,
 } from "@/app/actions/entries";
 import { upsertPeriodOverrides } from "@/app/actions/periods";
 import { generateRecurringEntries } from "@/app/actions/recurring";
 import { applyTemplate } from "@/app/actions/workspace";
 import type { Category, CategoryGroup, PeriodOverride, Period, EntryRow } from "@/types/database";
+import { calculateNetCashFlow, calculateRetainedEarnings, calculateClosingBalance, calculateSavingsRate } from "@/lib/calculations";
 
 const MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June",
@@ -57,6 +58,73 @@ interface MonthClientProps {
     month: number;
 }
 
+interface EntryTableRowProps {
+    entry: EntryRow;
+    index: number;
+    relevantCategories: Category[];
+    showCategory?: boolean;
+    onUpdate: (id: string, field: string, value: string | number) => void;
+    onRemove: (id: string) => void;
+}
+
+function EntryTableRow({
+    entry,
+    index,
+    relevantCategories,
+    showCategory = false,
+    onUpdate,
+    onRemove,
+}: EntryTableRowProps) {
+    return (
+        <TableRow className="group">
+            <TableCell className="text-muted-foreground text-xs">{index + 1}</TableCell>
+            <TableCell>
+                <Input
+                    value={entry.description}
+                    onChange={(e) => onUpdate(entry.id, "description", e.target.value)}
+                    className="h-8 border-0 bg-transparent px-1 focus-visible:bg-background/50"
+                    placeholder="Description"
+                />
+            </TableCell>
+            {showCategory && (
+                <TableCell>
+                    <Select
+                        value={entry.category_id}
+                        onValueChange={(v) => onUpdate(entry.id, "category_id", v)}
+                    >
+                        <SelectTrigger className="h-8 border-0 bg-transparent text-xs">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {relevantCategories.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </TableCell>
+            )}
+            <TableCell className="text-right">
+                <Input
+                    type="number"
+                    value={entry.amount === 0 ? "" : entry.amount}
+                    onChange={(e) => onUpdate(entry.id, "amount", parseFloat(e.target.value) || 0)}
+                    className="h-8 border-0 bg-transparent px-1 text-right focus-visible:bg-background/50"
+                />
+            </TableCell>
+            <TableCell>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => onRemove(entry.id)}
+                >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                </Button>
+            </TableCell>
+        </TableRow>
+    );
+}
+
 export default function MonthClient({
     period,
     entries: initialEntries,
@@ -82,7 +150,29 @@ export default function MonthClient({
         !!initialOverrides?.closing_balance_override
     );
     const [saving, setSaving] = useState(false);
+    const [syncState, setSyncState] = useState<"idle" | "saving" | "saved" | "error">("idle");
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+    const initialConfig = useRef({ openingBalance: openingBalance, dividends: dividends, closingOverrideEnabled: closingOverrideEnabled, closingOverride: closingOverride });
+
+    // Auto-save effect
+    useEffect(() => {
+        const hasPendingChanges = entries.some(e => (e.isNew && e.description) || e.isEdited) ||
+            openingBalance !== initialConfig.current.openingBalance ||
+            dividends !== initialConfig.current.dividends ||
+            closingOverrideEnabled !== initialConfig.current.closingOverrideEnabled ||
+            closingOverride !== initialConfig.current.closingOverride;
+
+        if (!hasPendingChanges) return;
+
+        setSyncState("saving");
+        const timer = setTimeout(() => {
+            saveAll(false);
+            initialConfig.current = { openingBalance, dividends, closingOverrideEnabled, closingOverride };
+        }, 1500);
+
+        return () => clearTimeout(timer);
+    }, [entries, openingBalance, dividends, closingOverrideEnabled, closingOverride]);
 
     const incomeGroups = categoryGroups.filter((g) => g.type === "income");
     const expenseGroups = categoryGroups.filter((g) => g.type === "expense");
@@ -92,10 +182,10 @@ export default function MonthClient({
 
     const revenue = incomeEntries.reduce((s, e) => s + Number(e.amount), 0);
     const expenseTotal = expenseEntries.reduce((s, e) => s + Number(e.amount), 0);
-    const netCashFlow = revenue - expenseTotal;
-    const retainedEarnings = netCashFlow - dividends;
+    const netCashFlow = calculateNetCashFlow(revenue, expenseTotal);
+    const retainedEarnings = calculateRetainedEarnings(netCashFlow, dividends);
     const openBal = openingBalance ? parseFloat(openingBalance) : 0;
-    const computedClosing = openBal + netCashFlow - dividends;
+    const computedClosing = calculateClosingBalance(openBal, netCashFlow, dividends);
     const closingBalance = closingOverrideEnabled && closingOverride
         ? parseFloat(closingOverride)
         : computedClosing;
@@ -149,7 +239,7 @@ export default function MonthClient({
         setEntries((prev) => [
             ...prev,
             {
-                id: `new-${Date.now()}`,
+                id: crypto.randomUUID(),
                 direction,
                 category_id: defaultCat,
                 description: "",
@@ -169,7 +259,8 @@ export default function MonthClient({
     };
 
     const removeRow = async (id: string) => {
-        if (id.startsWith("new-")) {
+        const entryToRemove = entries.find((e) => e.id === id);
+        if (entryToRemove?.isNew) {
             setEntries((prev) => prev.filter((e) => e.id !== id));
             return;
         }
@@ -182,13 +273,16 @@ export default function MonthClient({
         }
     };
 
-    const saveAll = async () => {
-        setSaving(true);
+    const saveAll = async (showToast = true) => {
+        if (showToast) setSaving(true);
+
         try {
-            const newEntries = entries.filter((e) => e.isNew && e.description);
-            if (newEntries.length > 0) {
-                await bulkCreateEntries(
-                    newEntries.map((e) => ({
+            const toSave = entries.filter((e) => (e.isNew && e.description) || e.isEdited);
+
+            if (toSave.length > 0) {
+                await upsertEntries(
+                    toSave.map((e) => ({
+                        id: e.id,
                         workspace_id: workspaceId,
                         period_id: period.id,
                         direction: e.direction,
@@ -197,15 +291,11 @@ export default function MonthClient({
                         amount: Number(e.amount),
                     }))
                 );
-            }
 
-            const editedEntries = entries.filter((e) => e.isEdited);
-            for (const entry of editedEntries) {
-                await updateEntry(entry.id, {
-                    description: entry.description,
-                    amount: Number(entry.amount),
-                    category_id: entry.category_id,
-                });
+                const savedIds = new Set(toSave.map(e => e.id));
+                setEntries(prev => prev.map(e =>
+                    savedIds.has(e.id) ? { ...e, isNew: false, isEdited: false } : e
+                ));
             }
 
             await upsertPeriodOverrides(period.id, {
@@ -215,12 +305,14 @@ export default function MonthClient({
                     ? parseFloat(closingOverride) : null,
             });
 
-            toast.success("All changes saved");
+            if (showToast) toast.success("All changes saved");
+            setSyncState("saved");
             router.refresh();
         } catch {
-            toast.error("Failed to save changes");
+            if (showToast) toast.error("Failed to save changes");
+            setSyncState("error");
         } finally {
-            setSaving(false);
+            if (showToast) setSaving(false);
         }
     };
 
@@ -239,7 +331,7 @@ export default function MonthClient({
                     const description = parts[0]?.trim() || "";
                     const amount = parseFloat(parts[1]?.replace(/[^0-9.-]/g, "") || "0");
                     return {
-                        id: `new-${Date.now()}-${Math.random()}`,
+                        id: crypto.randomUUID(),
                         direction,
                         category_id: defaultCat,
                         description,
@@ -285,65 +377,7 @@ export default function MonthClient({
 
     const hasGroups = categoryGroups.length > 0;
 
-    // Table row component for an entry
-    const EntryTableRow = ({
-        entry,
-        index,
-        relevantCategories,
-        showCategory = false,
-    }: {
-        entry: EntryRow;
-        index: number;
-        relevantCategories: Category[];
-        showCategory?: boolean;
-    }) => (
-        <TableRow key={entry.id} className="group">
-            <TableCell className="text-muted-foreground text-xs">{index + 1}</TableCell>
-            <TableCell>
-                <Input
-                    value={entry.description}
-                    onChange={(e) => updateRow(entry.id, "description", e.target.value)}
-                    className="h-8 border-0 bg-transparent px-1 focus-visible:bg-background/50"
-                    placeholder="Description"
-                />
-            </TableCell>
-            {showCategory && (
-                <TableCell>
-                    <Select
-                        value={entry.category_id}
-                        onValueChange={(v) => updateRow(entry.id, "category_id", v)}
-                    >
-                        <SelectTrigger className="h-8 border-0 bg-transparent text-xs">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {relevantCategories.map((c) => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </TableCell>
-            )}
-            <TableCell className="text-right">
-                <Input
-                    type="number"
-                    value={entry.amount}
-                    onChange={(e) => updateRow(entry.id, "amount", parseFloat(e.target.value) || 0)}
-                    className="h-8 border-0 bg-transparent px-1 text-right focus-visible:bg-background/50"
-                />
-            </TableCell>
-            <TableCell>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => removeRow(entry.id)}
-                >
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-            </TableCell>
-        </TableRow>
-    );
+
 
     // Render entries grouped by category within a group
     const renderGroupSection = (
@@ -443,6 +477,8 @@ export default function MonthClient({
                                                         entry={entry}
                                                         index={i}
                                                         relevantCategories={groupCats}
+                                                        onUpdate={updateRow}
+                                                        onRemove={removeRow}
                                                     />
                                                 ))}
                                             </TableBody>
@@ -512,6 +548,8 @@ export default function MonthClient({
                                     index={i}
                                     relevantCategories={categories.filter((c) => c.type === direction)}
                                     showCategory
+                                    onUpdate={updateRow}
+                                    onRemove={removeRow}
                                 />
                             ))}
                             {ungroupedEntries.length === 0 && (
@@ -552,11 +590,16 @@ export default function MonthClient({
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mr-2 text-xs text-muted-foreground font-medium">
+                        {syncState === "saving" && <span className="flex items-center gap-1.5"><RotateCw className="h-3 w-3 animate-spin" /> Saving...</span>}
+                        {syncState === "saved" && <span className="flex items-center gap-1.5 text-emerald-500"><Save className="h-3 w-3" /> Saved</span>}
+                        {syncState === "error" && <span className="flex items-center gap-1.5 text-destructive"><AlertTriangle className="h-3 w-3" /> Error saving</span>}
+                    </div>
                     <Button variant="outline" size="sm" onClick={handleGenerate}>
                         <RotateCw className="h-3.5 w-3.5 mr-1.5" />
                         Generate Recurring
                     </Button>
-                    <Button size="sm" onClick={saveAll} disabled={saving}>
+                    <Button size="sm" onClick={() => saveAll(true)} disabled={saving}>
                         <Save className="h-3.5 w-3.5 mr-1.5" />
                         {saving ? "Saving..." : "Save All"}
                     </Button>
@@ -685,7 +728,7 @@ export default function MonthClient({
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs text-muted-foreground">Savings Rate</span>
                                             <span className={`text-sm font-bold ${revenue > 0 && netCashFlow > 0 ? "positive-value" : "negative-value"}`}>
-                                                {revenue > 0 ? ((netCashFlow / revenue) * 100).toFixed(1) : "0.0"}%
+                                                {calculateSavingsRate(revenue, netCashFlow).toFixed(1)}%
                                             </span>
                                         </div>
                                         <Separator />

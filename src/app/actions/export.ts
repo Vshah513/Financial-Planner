@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { calculateNetCashFlow, calculateRetainedEarnings, calculateClosingBalance } from "@/lib/calculations";
 import * as XLSX from "xlsx";
 
 const MONTH_NAMES = [
@@ -60,11 +61,11 @@ export async function exportYearXLSX(workspaceId: string, year: number) {
                 .eq("period_id", period.id)
                 .single();
 
-            const netCashFlow = revenue - expenses;
             const dividends = override?.dividends_released || 0;
-            const retained = netCashFlow - dividends;
+            const netCashFlow = calculateNetCashFlow(revenue, expenses);
+            const retained = calculateRetainedEarnings(netCashFlow, dividends);
             const opening = override?.opening_balance_override ?? 0;
-            const closing = override?.closing_balance_override ?? (opening + netCashFlow - dividends);
+            const closing = override?.closing_balance_override ?? calculateClosingBalance(opening, netCashFlow, dividends);
 
             summaryRows.push([
                 MONTH_NAMES[period.month - 1],

@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { calculateNetCashFlow } from "@/lib/calculations";
 
 export interface BaselineData {
     source: 'actuals' | 'planner';
@@ -11,6 +12,7 @@ export interface BaselineData {
     periodWindow?: string;
     expenseBreakdown?: Record<string, number>;
     incomeBreakdown?: Record<string, number>;
+    monthsCovered?: number;
 }
 
 interface BaselineSelectorProps {
@@ -87,14 +89,21 @@ export function BaselineSelector({
                                     </div>
                                     <div className="flex justify-between text-sm border-t border-border pt-1 mt-1">
                                         <span className="text-muted-foreground">Net Cash Flow:</span>
-                                        <span className={`font-medium ${actualsBaseline.monthlyIncome - actualsBaseline.monthlyExpenses >= 0
-                                                ? 'text-green-600 dark:text-green-400'
-                                                : 'text-red-600 dark:text-red-400'
+                                        <span className={`font-medium ${calculateNetCashFlow(actualsBaseline.monthlyIncome, actualsBaseline.monthlyExpenses) >= 0
+                                            ? 'text-green-600 dark:text-green-400'
+                                            : 'text-red-600 dark:text-red-400'
                                             }`}>
-                                            {formatCurrency(actualsBaseline.monthlyIncome - actualsBaseline.monthlyExpenses)}
+                                            {formatCurrency(calculateNetCashFlow(actualsBaseline.monthlyIncome, actualsBaseline.monthlyExpenses))}
                                         </span>
                                     </div>
                                 </div>
+                                {actualsBaseline.monthsCovered !== undefined && (
+                                    <div className="mt-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-border">
+                                        {actualsBaseline.monthsCovered <= 1
+                                            ? `Note: You have only uploaded data for ${actualsBaseline.periodWindow}. Results will be based on this month.`
+                                            : `Note: Results are based on ${actualsBaseline.monthsCovered} months of data (${actualsBaseline.periodWindow}).`}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -121,14 +130,21 @@ export function BaselineSelector({
                                     </div>
                                     <div className="flex justify-between text-sm border-t border-border pt-1 mt-1">
                                         <span className="text-muted-foreground">Net Cash Flow:</span>
-                                        <span className={`font-medium ${plannerBaseline.monthlyIncome - plannerBaseline.monthlyExpenses >= 0
-                                                ? 'text-green-600 dark:text-green-400'
-                                                : 'text-red-600 dark:text-red-400'
+                                        <span className={`font-medium ${calculateNetCashFlow(plannerBaseline.monthlyIncome, plannerBaseline.monthlyExpenses) >= 0
+                                            ? 'text-green-600 dark:text-green-400'
+                                            : 'text-red-600 dark:text-red-400'
                                             }`}>
-                                            {formatCurrency(plannerBaseline.monthlyIncome - plannerBaseline.monthlyExpenses)}
+                                            {formatCurrency(calculateNetCashFlow(plannerBaseline.monthlyIncome, plannerBaseline.monthlyExpenses))}
                                         </span>
                                     </div>
                                 </div>
+                                {plannerBaseline.monthsCovered !== undefined && (
+                                    <div className="mt-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-border">
+                                        {plannerBaseline.monthsCovered <= 1
+                                            ? `Note: You have only created planner entries for ${plannerBaseline.periodWindow}. Results will be based on this month.`
+                                            : `Note: Results are based on ${plannerBaseline.monthsCovered} months of planner data (${plannerBaseline.periodWindow}).`}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

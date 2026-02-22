@@ -2,6 +2,7 @@
  * Scenario Engine - Core projection logic for financial scenarios
  * Used by Life Event Simulator and potentially other tools
  */
+import { calculateNetCashFlow } from "@/lib/calculations";
 
 // Life event types
 export type LifeEventType = "move-house" | "have-baby" | "lose-job" | "buy-car" | "custom";
@@ -65,7 +66,7 @@ export function projectScenario(config: ScenarioConfig): ScenarioResult {
         // Calculate monthly cash flow
         const income = adjustedIncome;
         const expenses = adjustedExpenses + debtPayment + oneTimeCost;
-        const netCashFlow = income - expenses;
+        const netCashFlow = calculateNetCashFlow(income, -expenses);
 
         // Update running cash
         runningCash += netCashFlow;
