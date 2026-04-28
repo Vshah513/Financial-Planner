@@ -37,7 +37,7 @@ export async function getAIInsights(workspaceId: string): Promise<{
         return {
             available: false,
             insights: [
-                { title: "AI not configured yet", body: "On Vercel: enable AI Gateway for this project. Or set GOOGLE_GENERATIVE_AI_API_KEY in Vercel env vars to unlock smart insights.", tone: "neutral" },
+                { title: "AI not configured yet", body: "Set GOOGLE_GENERATIVE_AI_API_KEY in Vercel Project → Environment Variables (Production + Preview), then redeploy to unlock smart insights.", tone: "neutral" },
                 { title: "Live data is ready", body: "Your real Supabase data flows in — once AI is enabled, it can generate insights from your ledger.", tone: "neutral" },
                 { title: "Assistant import + chat", body: "Once AI is enabled, the month importer and chat assistant will work in production too.", tone: "neutral" },
             ],

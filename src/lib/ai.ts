@@ -1,6 +1,5 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LanguageModel } from "ai";
-import { gateway } from "@ai-sdk/gateway";
 
 // Google Gemini via AI SDK — free tier from https://aistudio.google.com/app/apikey
 // Set GOOGLE_GENERATIVE_AI_API_KEY (or GEMINI_API_KEY) in .env.local
@@ -112,31 +111,10 @@ export async function getGeminiModel(tier: ModelTier = "smart"): Promise<Languag
     return google(modelName);
 }
 
-export function gatewayAvailable() {
-    // On Vercel, OIDC credentials are provided automatically (or via `vercel env pull` locally).
-    // We also accept explicit gateway keys for non-OIDC setups.
-    return Boolean(
-        process.env.VERCEL === "1" ||
-            process.env.VERCEL_OIDC_TOKEN?.trim() ||
-            process.env.AI_GATEWAY_API_KEY?.trim()
-    );
-}
-
 export async function getAIModel(tier: ModelTier = "smart"): Promise<LanguageModel> {
-    // Prefer Vercel AI Gateway when available (more reliable in prod, no provider keys).
-    if (gatewayAvailable()) {
-        // These model strings route through the AI Gateway.
-        // "smart" favors quality; "fast" favors latency/cost.
-        const modelName =
-            tier === "fast"
-                ? (process.env.AI_MODEL_FAST?.trim() || "anthropic/claude-haiku-4.1")
-                : (process.env.AI_MODEL_SMART?.trim() || "anthropic/claude-sonnet-4.6");
-        return gateway(modelName);
-    }
-
     return getGeminiModel(tier);
 }
 
 export function aiAvailable() {
-    return gatewayAvailable() || Boolean(getApiKey());
+    return Boolean(getApiKey());
 }
