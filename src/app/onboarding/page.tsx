@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createWorkspace } from "@/app/actions/workspace";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,24 @@ export default function OnboardingPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const router = useRouter();
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            const raw = localStorage.getItem("cc_onboarding");
+            if (!raw) return;
+            const data = JSON.parse(raw) as {
+                name?: string;
+                mode?: WorkspaceMode;
+                currency?: string;
+                fiscalStart?: string;
+            };
+            if (data.name) setName(data.name);
+            if (data.mode) setMode(data.mode);
+            if (data.currency) setCurrency(data.currency);
+            if (data.fiscalStart) setFiscalStart(data.fiscalStart);
+        } catch { }
+    }, []);
 
     const handleCreate = async () => {
         setLoading(true);

@@ -50,6 +50,11 @@ export function ProductTour() {
             content: "Finally, check out Settings. Here you can seamlessly toggle between Business and Personal modes to keep your finances organized.",
             placement: "right",
         },
+        {
+            target: "#tour-ai-chat",
+            content: "Tap the sparkle button anytime to ask Gemini about your real numbers — cash flow, categories, budgets, and more.",
+            placement: "left",
+        },
     ];
 
     if (!run) return null;

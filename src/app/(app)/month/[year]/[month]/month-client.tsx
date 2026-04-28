@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -152,6 +153,8 @@ export default function MonthClient({
     const [saving, setSaving] = useState(false);
     const [syncState, setSyncState] = useState<"idle" | "saving" | "saved" | "error">("idle");
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    const [assistantText, setAssistantText] = useState("");
+    const [assistantImporting, setAssistantImporting] = useState(false);
 
     const initialConfig = useRef({ openingBalance: openingBalance, dividends: dividends, closingOverrideEnabled: closingOverrideEnabled, closingOverride: closingOverride });
 
@@ -367,6 +370,61 @@ export default function MonthClient({
             router.refresh();
         } catch {
             toast.error("Failed to apply template");
+        }
+    };
+
+    const handleAssistantImport = async () => {
+        const text = assistantText.trim();
+        if (!text) return;
+
+        setAssistantImporting(true);
+        try {
+            const res = await fetch("/api/month/import", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    workspaceId,
+                    periodId: period.id,
+                    text,
+                }),
+            });
+
+            const json = (await res.json().catch(() => null)) as
+                | { entries?: Array<{ direction: "income" | "expense"; description: string; amount: number; categoryId: string }>; error?: string }
+                | null;
+
+            if (!res.ok) {
+                throw new Error(json?.error || "Import failed");
+            }
+
+            const imported = (json?.entries ?? []).filter(
+                (e) => e && e.description && e.amount > 0 && e.categoryId
+            );
+
+            if (!imported.length) {
+                toast.message("No entries detected", {
+                    description: "Try a clearer list like “Rent 2100, Groceries 120.50, Paycheck 5200”.",
+                });
+                return;
+            }
+
+            const newRows: EntryRow[] = imported.map((e) => ({
+                id: crypto.randomUUID(),
+                direction: e.direction,
+                category_id: e.categoryId,
+                description: e.description,
+                amount: Number(e.amount),
+                notes: null,
+                isNew: true,
+            }));
+
+            setEntries((prev) => [...prev, ...newRows]);
+            setAssistantText("");
+            toast.success(`Imported ${newRows.length} entr${newRows.length === 1 ? "y" : "ies"}`);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to import entries");
+        } finally {
+            setAssistantImporting(false);
         }
     };
 
@@ -605,6 +663,45 @@ export default function MonthClient({
                     </Button>
                 </div>
             </div>
+
+            {/* Assistant Import */}
+            <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+                <CardHeader className="py-4">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary/70" />
+                        Assistant Import
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <Textarea
+                        value={assistantText}
+                        onChange={(e) => setAssistantText(e.target.value)}
+                        placeholder={`Type or paste a messy list, e.g.\nPaycheck 5200\nRent 2100\nGroceries 120.50\nUber 34.20`}
+                        className="min-h-28"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={handleAssistantImport}
+                            disabled={assistantImporting || !assistantText.trim()}
+                        >
+                            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                            {assistantImporting ? "Importing..." : "Import into this month"}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setAssistantText("")}
+                            disabled={assistantImporting || !assistantText}
+                        >
+                            Clear
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                            This will add rows below; your existing auto-save will save them.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Empty state: no groups */}
             {!hasGroups && (

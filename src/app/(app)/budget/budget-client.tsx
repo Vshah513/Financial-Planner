@@ -118,9 +118,9 @@ export default function BudgetClient({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Budget</h1>
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Budget</h1>
                     <p className="text-sm text-muted-foreground mt-1">{periodLabel} · Budget vs Actual</p>
                 </div>
                 <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>

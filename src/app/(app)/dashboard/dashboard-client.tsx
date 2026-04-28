@@ -49,6 +49,10 @@ import {
 import type { YearSummary } from "@/types/database";
 import { getYearSummary } from "@/app/actions/periods";
 import { ensurePeriodsForYear } from "@/app/actions/workspace";
+import { AIInsightsCards } from "@/components/ai-insights-cards";
+import { RealtimePulse } from "@/components/realtime-pulse";
+import { CategoryRadar } from "@/components/charts/category-radar";
+import { SpendHeatmap } from "@/components/charts/spend-heatmap";
 
 const MONTH_NAMES_SHORT = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -143,10 +147,12 @@ export default function DashboardClient({
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">{workspaceName}</h1>
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{workspaceName}</h1>
+                        <RealtimePulse workspaceId={workspaceId} />
+                    </div>
                     <p className="text-sm text-muted-foreground">Year Summary</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -168,6 +174,8 @@ export default function DashboardClient({
                     </Button>
                 </div>
             </div>
+
+            <AIInsightsCards workspaceId={workspaceId} />
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -248,6 +256,11 @@ export default function DashboardClient({
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <CategoryRadar workspaceId={workspaceId} year={year} currency={currency} />
+                <SpendHeatmap workspaceId={workspaceId} year={year} currency={currency} />
             </div>
 
             {/* Monthly Summary Table */}
