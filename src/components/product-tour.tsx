@@ -30,30 +30,17 @@ export function ProductTour() {
 
     const steps: Step[] = [
         {
-            target: "#tour-export-link",
-            content: "Welcome to Cash Clarity! To get started, you can upload CSV or Excel sheets of your monthly transactions from your bank—saving you hours of manual data entry.",
-            placement: "right",
+            target: "#tour-month-link",
+            content:
+                "Start by adding your monthly data. Use Months to enter income/expenses manually, or use Export / Import (next to Settings) to upload a CSV.",
+            placement: "bottom",
             disableBeacon: true,
         },
         {
-            target: "#tour-month-link",
-            content: "Prefer to upload data manually? Click into any month to start adding your income and expenses, or simply view detailed category breakdowns.",
-            placement: "right",
-        },
-        {
             target: "#tour-tools-link",
-            content: "Head over to our powerful Tools to run simulations! You can forecast specific financial events, calculate your runway, and ensure your pricing margins are profitable.",
-            placement: "right",
-        },
-        {
-            target: "#tour-settings-link",
-            content: "Finally, check out Settings. Here you can seamlessly toggle between Business and Personal modes to keep your finances organized.",
-            placement: "right",
-        },
-        {
-            target: "#tour-ai-chat",
-            content: "Tap the sparkle button anytime to ask Gemini about your real numbers — cash flow, categories, budgets, and more.",
-            placement: "left",
+            content:
+                "Once your data is in, click Tools to run simulations and reports based on your real numbers.",
+            placement: "bottom",
         },
     ];
 

@@ -111,6 +111,11 @@ export default function TopNav({ year }: { year: number }) {
                                 <Link
                                     key={link.href}
                                     href={link.href}
+                                    id={
+                                        link.href === "/tools"
+                                            ? "tour-tools-link"
+                                            : undefined
+                                    }
                                     className={cn(
                                         "relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer",
                                         active
@@ -133,6 +138,7 @@ export default function TopNav({ year }: { year: number }) {
 
                         <div className="relative">
                             <button
+                                id="tour-month-link"
                                 onClick={() => setMonthsOpen((o) => !o)}
                                 onBlur={() => setTimeout(() => setMonthsOpen(false), 150)}
                                 className={cn(
@@ -191,6 +197,13 @@ export default function TopNav({ year }: { year: number }) {
                                     key={link.href}
                                     href={link.href}
                                     aria-label={link.label}
+                                    id={
+                                        link.href === "/export"
+                                            ? "tour-export-link"
+                                            : link.href === "/settings"
+                                                ? "tour-settings-link"
+                                                : undefined
+                                    }
                                     className={cn(
                                         "hidden md:flex h-9 w-9 items-center justify-center rounded-full border border-border/40 bg-background/40 backdrop-blur cursor-pointer hover:bg-background/60 transition-colors",
                                         pathname === link.href && "ring-1 ring-primary/50"

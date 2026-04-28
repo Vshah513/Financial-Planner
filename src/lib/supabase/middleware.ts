@@ -12,7 +12,8 @@ export async function updateSession(request: NextRequest) {
         const isAuthPage = path === "/auth";
         const isLanding = path === "/";
         const isGetStarted = path.startsWith("/get-started");
-        const isPublicPath = isAuthPage || isLanding || isGetStarted;
+        const isDemo = path.startsWith("/demo");
+        const isPublicPath = isAuthPage || isLanding || isGetStarted || isDemo;
 
         if (isPublicPath) return NextResponse.next({ request });
 
@@ -57,7 +58,8 @@ export async function updateSession(request: NextRequest) {
     const isAuthPage = path === "/auth";
     const isLanding = path === "/";
     const isGetStarted = path.startsWith("/get-started");
-    const isPublicPath = isAuthPage || isLanding || isGetStarted;
+    const isDemo = path.startsWith("/demo");
+    const isPublicPath = isAuthPage || isLanding || isGetStarted || isDemo;
 
     if (!user && !isPublicPath) {
         const url = request.nextUrl.clone();

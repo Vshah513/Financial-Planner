@@ -20,6 +20,14 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
     Plus, Trash2, Save, ChevronLeft, ChevronRight, Clipboard, RotateCw,
     AlertTriangle, ChevronDown, ChevronUp, Sparkles,
 } from "lucide-react";
@@ -155,8 +163,23 @@ export default function MonthClient({
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
     const [assistantText, setAssistantText] = useState("");
     const [assistantImporting, setAssistantImporting] = useState(false);
+    const [showMonthFirstRun, setShowMonthFirstRun] = useState(false);
 
     const initialConfig = useRef({ openingBalance: openingBalance, dividends: dividends, closingOverrideEnabled: closingOverrideEnabled, closingOverride: closingOverride });
+
+    useEffect(() => {
+        // Show a one-time quick helper when a user opens any month for the first time.
+        // Uses a versioned key so we can evolve messaging later without breaking old users.
+        try {
+            const key = "cash-clarity-month-first-run-v1";
+            if (localStorage.getItem(key)) return;
+            localStorage.setItem(key, "true");
+            const t = setTimeout(() => setShowMonthFirstRun(true), 700);
+            return () => clearTimeout(t);
+        } catch {
+            // ignore storage errors
+        }
+    }, []);
 
     // Auto-save effect
     useEffect(() => {
@@ -626,6 +649,54 @@ export default function MonthClient({
 
     return (
         <div className="space-y-6">
+            <Dialog open={showMonthFirstRun} onOpenChange={setShowMonthFirstRun}>
+                <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>Quick start</DialogTitle>
+                        <DialogDescription>
+                            Want a fast walkthrough? You can try the sandbox demo (no real data) or start importing right away.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 text-sm">
+                        <div className="rounded-lg border border-border/50 p-3 bg-muted/20">
+                            <p className="font-medium">Recommended</p>
+                            <p className="text-muted-foreground text-xs mt-1">
+                                Try the sandbox demo to see how “Assistant Import” auto-sorts a messy list into categories.
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-border/50 p-3 bg-muted/10">
+                            <p className="font-medium">Or just start here</p>
+                            <p className="text-muted-foreground text-xs mt-1">
+                                Paste expenses/income into Assistant Import, or add entries manually below.
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowMonthFirstRun(false)}>
+                            Skip
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                window.open("/demo", "_blank", "noopener,noreferrer");
+                                setShowMonthFirstRun(false);
+                            }}
+                        >
+                            Open sandbox demo
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                setShowMonthFirstRun(false);
+                                const el = document.querySelector('[data-slot="textarea"]') as HTMLElement | null;
+                                el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }}
+                        >
+                            Start importing
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
