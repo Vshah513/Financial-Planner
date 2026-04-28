@@ -3,7 +3,7 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { getGeminiModel, aiAvailable } from "@/lib/ai";
+import { getAIModel, aiAvailable } from "@/lib/ai";
 
 const ResultSchema = z.object({
     classifications: z.array(
@@ -64,7 +64,7 @@ export async function aiCategorizeTransactions(
 
     try {
         const { output } = await generateText({
-            model: await getGeminiModel("fast"),
+            model: await getAIModel("fast"),
             output: Output.object({ schema: ResultSchema }),
             system: `You categorize financial transactions. Choose the best matching category id from the list.
 Use empty string only if no category fits. Confidence: 1.0 = certain, 0.5 = guess, 0.2 = unsure.`,

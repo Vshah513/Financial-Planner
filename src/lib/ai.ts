@@ -115,7 +115,11 @@ export async function getGeminiModel(tier: ModelTier = "smart"): Promise<Languag
 export function gatewayAvailable() {
     // On Vercel, OIDC credentials are provided automatically (or via `vercel env pull` locally).
     // We also accept explicit gateway keys for non-OIDC setups.
-    return Boolean(process.env.VERCEL_OIDC_TOKEN?.trim() || process.env.AI_GATEWAY_API_KEY?.trim());
+    return Boolean(
+        process.env.VERCEL === "1" ||
+            process.env.VERCEL_OIDC_TOKEN?.trim() ||
+            process.env.AI_GATEWAY_API_KEY?.trim()
+    );
 }
 
 export async function getAIModel(tier: ModelTier = "smart"): Promise<LanguageModel> {

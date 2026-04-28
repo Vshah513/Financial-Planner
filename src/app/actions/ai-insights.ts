@@ -3,7 +3,7 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { getGeminiModel, aiAvailable } from "@/lib/ai";
+import { getAIModel, aiAvailable } from "@/lib/ai";
 
 const InsightsSchema = z.object({
     insights: z
@@ -37,9 +37,9 @@ export async function getAIInsights(workspaceId: string): Promise<{
         return {
             available: false,
             insights: [
-                { title: "AI not configured yet", body: "Add GOOGLE_GENERATIVE_AI_API_KEY to .env.local (Google AI Studio) to unlock smart insights.", tone: "neutral" },
-                { title: "Live data is ready", body: "Your real Supabase data flows in — just plug in a key.", tone: "neutral" },
-                { title: "Try the chat assistant", body: "Click the sparkle button. Once keys are set, it reads your real ledger.", tone: "neutral" },
+                { title: "AI not configured yet", body: "On Vercel: enable AI Gateway for this project. Or set GOOGLE_GENERATIVE_AI_API_KEY in Vercel env vars to unlock smart insights.", tone: "neutral" },
+                { title: "Live data is ready", body: "Your real Supabase data flows in — once AI is enabled, it can generate insights from your ledger.", tone: "neutral" },
+                { title: "Assistant import + chat", body: "Once AI is enabled, the month importer and chat assistant will work in production too.", tone: "neutral" },
             ],
         };
     }
@@ -97,7 +97,7 @@ export async function getAIInsights(workspaceId: string): Promise<{
 
     try {
         const { output } = await generateText({
-            model: await getGeminiModel("smart"),
+            model: await getAIModel("smart"),
             output: Output.object({ schema: InsightsSchema }),
             system:
                 "You are a sharp financial advisor. Generate exactly 3 insights from the data. Be specific with numbers. Mix one positive, one warning if applicable, and one informational.",
